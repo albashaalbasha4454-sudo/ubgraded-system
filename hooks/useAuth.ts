@@ -6,27 +6,22 @@ import type { User } from '../types';
 const defaultAdmin: User = {
   id: 'admin-001',
   username: 'admin',
-  password: 'swade.1234',
+  password: 'albasha.1234',
   role: 'admin',
 };
 
 const defaultCashier: User = {
   id: 'cashier-001',
   username: 'cashier',
-  password: 'bshbsh.1234',
+  password: 'albasha.1234',
   role: 'cashier',
 };
 
 function useAuth() {
   const [users, setUsers] = useLocalStorage<User[]>('users', []);
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    try {
-      const item = window.sessionStorage.getItem('currentUser');
-      return item ? JSON.parse(item) : null;
-    } catch (error) {
-      return null;
-    }
-  });
+  // باستخدام useLocalStorage هنا، ستتم مزامنة حالة تسجيل الدخول الآن عبر علامات التبويب.
+  // كما أنه يحافظ على الجلسة عبر عمليات إعادة تشغيل المتصفح.
+  const [currentUser, setCurrentUser] = useLocalStorage<User | null>('currentUser', null);
 
   useEffect(() => {
     // If no users exist in localStorage, create the default admin and cashier users.
@@ -39,7 +34,6 @@ function useAuth() {
     const user = users.find(u => u.username === username && u.password === password);
     if (user) {
       setCurrentUser(user);
-      window.sessionStorage.setItem('currentUser', JSON.stringify(user));
       return true;
     }
     return false;
@@ -47,7 +41,6 @@ function useAuth() {
 
   const logout = () => {
     setCurrentUser(null);
-    window.sessionStorage.removeItem('currentUser');
   };
 
   const addUser = (user: Omit<User, 'id'>) => {

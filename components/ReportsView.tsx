@@ -1,36 +1,44 @@
 import React, { useMemo, useState } from 'react';
-import type { Invoice, Product } from '../types';
+import type { Invoice, Product, Expense } from '../types';
 
 interface ReportsViewProps {
   invoices: Invoice[];
   products: Product[];
+  expenses: Expense[];
 }
 
-const ReportsView: React.FC<ReportsViewProps> = ({ invoices, products }) => {
+const ReportsView: React.FC<ReportsViewProps> = ({ invoices, products, expenses }) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  const filteredInvoices = useMemo(() => {
+  const { filteredInvoices, filteredExpenses } = useMemo(() => {
     if (!startDate && !endDate) {
-      return invoices;
+      return { filteredInvoices: invoices, filteredExpenses: expenses };
     }
-    return invoices.filter(invoice => {
-      const invoiceDate = new Date(invoice.date);
-      const start = startDate ? new Date(startDate) : null;
-      const end = endDate ? new Date(endDate) : null;
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+    if(start) start.setHours(0,0,0,0);
+    if(end) end.setHours(23,59,59,999);
 
-      if(start) start.setHours(0,0,0,0);
-      if(end) end.setHours(23,59,59,999);
+    const dateFilter = (item: { date: string }) => {
+        const itemDate = new Date(item.date);
+        if (start && itemDate < start) return false;
+        if (end && itemDate > end) return false;
+        return true;
+    }
 
-      if (start && invoiceDate < start) return false;
-      if (end && invoiceDate > end) return false;
-      return true;
-    });
-  }, [invoices, startDate, endDate]);
+    return { 
+        filteredInvoices: invoices.filter(dateFilter),
+        filteredExpenses: expenses.filter(dateFilter)
+    };
+  }, [invoices, expenses, startDate, endDate]);
+
 
   const reportData = useMemo(() => {
     const totalRevenue = filteredInvoices.reduce((sum, inv) => sum + inv.total, 0);
     const totalSales = filteredInvoices.filter(inv => inv.type === 'sale').length;
+    const totalExpenses = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+    const netProfit = totalRevenue - totalExpenses;
 
     const productSales: { [key: string]: { name: string, quantitySold: number; revenue: number } } = {};
 
@@ -51,16 +59,17 @@ const ReportsView: React.FC<ReportsViewProps> = ({ invoices, products }) => {
     return {
       totalRevenue,
       totalSales,
-      totalProducts: products.length,
       bestSellingByQuantity,
       bestSellingByRevenue,
+      totalExpenses,
+      netProfit,
     };
-  }, [filteredInvoices, products]);
+  }, [filteredInvoices, filteredExpenses]);
 
-  const StatCard = ({ title, value, subtext }: { title: string, value: string | number, subtext?: string }) => (
+  const StatCard = ({ title, value, subtext, valueClassName }: { title: string, value: string | number, subtext?: string, valueClassName?: string }) => (
     <div className="bg-white p-6 rounded-lg shadow-md">
       <h3 className="text-gray-500 text-lg">{title}</h3>
-      <p className="text-3xl font-bold text-gray-800 my-2">{value}</p>
+      <p className={`text-3xl font-bold my-2 ${valueClassName || 'text-gray-800'}`}>{value}</p>
       {subtext && <p className="text-gray-400 text-sm">{subtext}</p>}
     </div>
   );
@@ -98,7 +107,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ invoices, products }) => {
 
   return (
     <div className="p-4 md:p-6">
-      <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6">تقرير المبيعات</h2>
+      <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6">تقرير الأرباح والخسائر</h2>
 
        <div className="bg-white p-4 rounded-lg shadow-md mb-6">
             <h3 className="text-lg font-semibold mb-2">تصفية حسب التاريخ</h3>
@@ -114,10 +123,15 @@ const ReportsView: React.FC<ReportsViewProps> = ({ invoices, products }) => {
             </div>
        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard title="صافي الإيرادات" value={`${reportData.totalRevenue.toFixed(2)}`} />
+        <StatCard title="إجمالي المصروفات" value={`${reportData.totalExpenses.toFixed(2)}`} />
+        <StatCard 
+            title="صافي الربح" 
+            value={`${reportData.netProfit.toFixed(2)}`}
+            valueClassName={reportData.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}
+        />
         <StatCard title="إجمالي فواتير البيع" value={reportData.totalSales} subtext="فاتورة" />
-        <StatCard title="عدد المنتجات" value={reportData.totalProducts} subtext="منتج في المخزون" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

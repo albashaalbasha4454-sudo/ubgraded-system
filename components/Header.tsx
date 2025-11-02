@@ -17,6 +17,7 @@ const Header: React.FC<HeaderProps> = ({ currentView, setCurrentView, user, onLo
     { key: 'pos', label: 'نقطة البيع', roles: ['admin', 'cashier'] },
     { key: 'products', label: 'البضاعة', roles: ['admin'] },
     { key: 'invoices', label: 'الفواتير', roles: ['admin', 'cashier'] },
+    { key: 'expenses', label: 'المصروفات', roles: ['admin'] },
     { key: 'return-requests', label: 'طلبات الإرجاع', roles: ['admin'] },
     { key: 'reports', label: 'التقارير', roles: ['admin'] },
     { key: 'settings', label: 'الإعدادات', roles: ['admin'] },

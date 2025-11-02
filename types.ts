@@ -41,4 +41,12 @@ export interface ReturnRequest {
   processedDate?: string;
 }
 
-export type View = 'pos' | 'products' | 'invoices' | 'reports' | 'settings' | 'users' | 'return-requests';
+export interface Expense {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  category?: string;
+}
+
+export type View = 'pos' | 'products' | 'invoices' | 'reports' | 'settings' | 'users' | 'return-requests' | 'expenses';
