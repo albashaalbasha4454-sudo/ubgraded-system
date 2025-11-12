@@ -1,6 +1,7 @@
 
+
 import React, { useEffect } from 'react';
-import type { Invoice } from '../types';
+import type { Invoice } from './types';
 
 interface PrintInvoiceProps {
   invoice: Invoice;
@@ -48,6 +49,7 @@ const PrintInvoice: React.FC<PrintInvoiceProps> = ({ invoice, onClose }) => {
                 <th className="p-2">الصنف</th>
                 <th className="p-2">الكمية</th>
                 <th className="p-2">سعر الوحدة</th>
+                <th className="p-2">الخصم</th>
                 <th className="p-2">الإجمالي</th>
               </tr>
             </thead>
@@ -57,7 +59,8 @@ const PrintInvoice: React.FC<PrintInvoiceProps> = ({ invoice, onClose }) => {
                   <td className="p-2">{item.productName}</td>
                   <td className="p-2">{item.quantity}</td>
                   <td className="p-2">{item.price.toFixed(2)}</td>
-                  <td className="p-2">{(item.quantity * item.price).toFixed(2)}</td>
+                  <td className="p-2">{(item.discount || 0).toFixed(2)}</td>
+                  <td className="p-2">{((item.price - (item.discount || 0)) * item.quantity).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>

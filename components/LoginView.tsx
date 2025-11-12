@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 interface LoginViewProps {
-  onLogin: (username: string, password: string) => boolean;
+  onLogin: (username: string, password: string) => Promise<boolean>;
 }
 
 const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
@@ -9,14 +9,14 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (!username || !password) {
       setError('الرجاء إدخال اسم المستخدم وكلمة المرور.');
       return;
     }
-    const success = onLogin(username, password);
+    const success = await onLogin(username, password);
     if (!success) {
       setError('اسم المستخدم أو كلمة المرور غير صحيحة.');
     }

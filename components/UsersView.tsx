@@ -1,30 +1,44 @@
 import React, { useState } from 'react';
 import type { User } from '../types';
 import Modal from './Modal';
+import InputField from './common/InputField';
 
 interface UsersViewProps {
   users: User[];
-  addUser: (user: Omit<User, 'id'>) => void;
+  addUser: (user: Omit<User, 'id' | 'passwordHash' | 'salt'> & { password: string }) => User;
+  updateUser: (id: string, user: Partial<Omit<User, 'id' | 'passwordHash' | 'salt'>> & { password?: string }) => void;
   deleteUser: (id: string) => void;
+  currentUser: User;
 }
 
-const UsersView: React.FC<UsersViewProps> = ({ users, addUser, deleteUser }) => {
+const UsersView: React.FC<UsersViewProps> = ({ users, addUser, updateUser, deleteUser, currentUser }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
-  const handleSaveUser = (userData: Omit<User, 'id'>) => {
-    try {
-        addUser(userData);
-        setIsModalOpen(false);
-    } catch (error) {
-        if (error instanceof Error) {
-            alert(error.message);
-        } else {
-            alert('حدث خطأ غير متوقع.');
-        }
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+
+  const handleOpenModal = (user: User | null = null) => {
+    setEditingUser(user);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setEditingUser(null);
+    setIsModalOpen(false);
+  };
+
+  const handleSave = (userData: any) => {
+    if (editingUser) {
+      updateUser(editingUser.id, userData);
+    } else {
+      addUser(userData);
     }
+    handleCloseModal();
   };
 
   const handleDelete = (id: string) => {
+    if (id === currentUser.id) {
+        alert("لا يمكنك حذف حسابك الخاص.");
+        return;
+    }
     if (window.confirm('هل أنت متأكد من حذف هذا المستخدم؟')) {
       deleteUser(id);
     }
@@ -32,120 +46,108 @@ const UsersView: React.FC<UsersViewProps> = ({ users, addUser, deleteUser }) => 
 
   return (
     <div className="p-4 md:p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl md:text-3xl font-bold text-gray-800">إدارة المستخدمين</h2>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-        >
-          إضافة مستخدم جديد
-        </button>
-      </div>
+      <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6">المستخدمون</h2>
+      <div className="bg-white shadow-md rounded-lg p-4">
+        <div className="flex justify-end mb-4">
+          <button onClick={() => handleOpenModal()} className="bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700">
+            + إضافة مستخدم جديد
+          </button>
+        </div>
 
-      <div className="bg-white shadow-md rounded-lg overflow-x-auto">
-        <table className="w-full table-auto text-right">
-          <thead className="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
-            <tr>
-              <th className="py-3 px-6">اسم المستخدم</th>
-              <th className="py-3 px-6">الدور/الصلاحية</th>
-              <th className="py-3 px-6 text-center">إجراءات</th>
-            </tr>
-          </thead>
-          <tbody className="text-gray-700 text-sm font-light">
-            {users.map((user) => (
-              <tr key={user.id} className="border-b border-gray-200 hover:bg-gray-50">
-                <td className="py-3 px-6 font-semibold">{user.username}</td>
-                <td className="py-3 px-6">{user.role === 'admin' ? 'مدير' : 'كاشير'}</td>
-                <td className="py-3 px-6 text-center">
-                  <div className="flex item-center justify-center">
-                    <button
-                      onClick={() => handleDelete(user.id)}
-                      disabled={user.username === 'admin'}
-                      className="w-8 h-8 rounded-full bg-red-200 text-red-700 flex items-center justify-center hover:bg-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                  </div>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full table-auto text-right">
+            <thead className="bg-gray-100 text-gray-600 uppercase text-sm">
+              <tr>
+                <th className="py-3 px-6">اسم المستخدم</th>
+                <th className="py-3 px-6">الدور</th>
+                <th className="py-3 px-6 text-center">الإجراءات</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="text-gray-700 text-sm">
+              {users.map((user) => (
+                <tr key={user.id} className="border-b border-gray-200 hover:bg-gray-50">
+                  <td className="py-3 px-6 font-semibold">{user.username}</td>
+                  <td className="py-3 px-6">{user.role === 'admin' ? 'مدير' : 'كاشير'}</td>
+                  <td className="py-3 px-6 text-center">
+                    <button onClick={() => handleOpenModal(user)} className="text-blue-600 hover:text-blue-800 font-semibold mr-4">تعديل</button>
+                    {user.id !== currentUser.id && (
+                        <button onClick={() => handleDelete(user.id)} className="text-red-600 hover:text-red-800 font-semibold">حذف</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="إضافة مستخدم جديد"
-      >
-        <UserForm
-          onSave={handleSaveUser}
-          onCancel={() => setIsModalOpen(false)}
+      {isModalOpen && (
+        <UserModal
+          user={editingUser}
+          onClose={handleCloseModal}
+          onSave={handleSave}
+          isEditing={!!editingUser}
         />
-      </Modal>
+      )}
     </div>
   );
 };
 
-const UserForm: React.FC<{
-  onSave: (user: Omit<User, 'id'>) => void;
-  onCancel: () => void;
-}> = ({ onSave, onCancel }) => {
-  const [username, setUsername] = useState('');
+// UserModal component
+const UserModal: React.FC<{
+  user: User | null;
+  onClose: () => void;
+  onSave: (data: any) => void;
+  isEditing: boolean;
+}> = ({ user, onClose, onSave, isEditing }) => {
+  const [username, setUsername] = useState(user?.username || '');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'admin' | 'cashier'>('cashier');
+  const [role, setRole] = useState<'admin' | 'cashier'>(user?.role || 'cashier');
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (username.trim() && password.trim()) {
-      onSave({ username, password, role });
-    } else {
-      alert('يرجى ملء جميع الحقول.');
+    const newErrors: { [key: string]: string } = {};
+    if (!username.trim()) newErrors.username = 'اسم المستخدم مطلوب.';
+    if (!isEditing && !password) {
+      newErrors.password = 'كلمة المرور مطلوبة للمستخدم الجديد.';
     }
+    
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    const dataToSave: any = { username, role };
+    if (password) {
+      dataToSave.password = password;
+    }
+    
+    onSave(dataToSave);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="block text-gray-700 text-sm font-bold mb-2">اسم المستخدم</label>
-        <input
-          type="text"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"
-        />
-      </div>
-      <div>
-        <label className="block text-gray-700 text-sm font-bold mb-2">كلمة المرور</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"
-        />
-      </div>
-      <div>
-        <label className="block text-gray-700 text-sm font-bold mb-2">الدور/الصلاحية</label>
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value as 'admin' | 'cashier')}
-          className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"
-        >
-          <option value="cashier">كاشير</option>
-          <option value="admin">مدير</option>
-        </select>
-      </div>
-      <div className="flex items-center justify-end gap-2 mt-6">
-        <button type="button" onClick={onCancel} className="bg-gray-500 text-white font-bold py-2 px-4 rounded hover:bg-gray-600">
-          إلغاء
-        </button>
-        <button type="submit" className="bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700">
-          حفظ
-        </button>
-      </div>
-    </form>
+    <Modal isOpen={true} onClose={onClose} title={user ? 'تعديل مستخدم' : 'إضافة مستخدم جديد'}>
+      <form onSubmit={handleSubmit}>
+        <InputField id="username" label="اسم المستخدم" value={username} onChange={(e) => setUsername(e.target.value)} error={errors.username}/>
+        <InputField id="password" label={`كلمة المرور ${isEditing ? '(اتركه فارغاً لعدم التغيير)' : ''}`} value={password} onChange={(e) => setPassword(e.target.value)} type="password" error={errors.password}/>
+        <div className="mb-4">
+            <label htmlFor="role" className="block text-gray-700 text-sm font-bold mb-2">الدور</label>
+            <select
+                id="role"
+                value={role}
+                onChange={(e) => setRole(e.target.value as 'admin' | 'cashier')}
+                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"
+            >
+                <option value="cashier">كاشير</option>
+                <option value="admin">مدير</option>
+            </select>
+        </div>
+        <div className="flex items-center justify-end gap-2">
+          <button type="button" onClick={onClose} className="bg-gray-500 text-white font-bold py-2 px-4 rounded hover:bg-gray-600">إلغاء</button>
+          <button type="submit" className="bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700">حفظ</button>
+        </div>
+      </form>
+    </Modal>
   );
 };
 

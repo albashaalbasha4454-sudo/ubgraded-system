@@ -1,154 +1,217 @@
-import React from 'react';
-import type { Product, Invoice, User } from '../types';
+import React, { useState, useRef } from 'react';
+import useLocalStorage from '../hooks/useLocalStorage';
+import InputField from './common/InputField';
 
 interface SettingsViewProps {
-  products: Product[];
-  invoices: Invoice[];
-  setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
-  setInvoices: React.Dispatch<React.SetStateAction<Invoice[]>>;
-  lowStockThreshold: number;
-  setLowStockThreshold: React.Dispatch<React.SetStateAction<number>>;
+  onUpdatePrices: (operation: 'multiply' | 'divide', factor: number) => void;
 }
 
-const SettingsView: React.FC<SettingsViewProps> = ({ products, invoices, setProducts, setInvoices, lowStockThreshold, setLowStockThreshold }) => {
+const SettingsView: React.FC<SettingsViewProps> = ({ onUpdatePrices }) => {
+  const [lowStockThreshold, setLowStockThreshold] = useLocalStorage<number>('lowStockThreshold', 5);
+  const [shopName, setShopName] = useLocalStorage<string>('shopName', 'اسم المحل');
+  const [shopAddress, setShopAddress] = useLocalStorage<string>('shopAddress', 'تفاصيل العنوان ورقم الهاتف');
   
+  const [priceFactor, setPriceFactor] = useState('1.0');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePriceUpdate = (operation: 'multiply' | 'divide') => {
+    const factor = parseFloat(priceFactor);
+    if(confirm(`هل أنت متأكد من ${operation === 'multiply' ? 'ضرب' : 'قسمة'} جميع أسعار البيع والتكلفة على المعامل ${factor}؟ هذا الإجراء لا يمكن التراجع عنه.`)) {
+        onUpdatePrices(operation, factor);
+    }
+  }
+
   const handleExport = () => {
     try {
-      const users = JSON.parse(localStorage.getItem('users') || '[]');
-      const dataToExport = {
-        products,
-        invoices,
-        users,
-      };
-      const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
-        JSON.stringify(dataToExport, null, 2)
-      )}`;
-      const link = document.createElement('a');
-      const date = new Date().toISOString().split('T')[0];
-      link.href = jsonString;
-      link.download = `pos-backup-${date}.json`;
-      link.click();
+        const dataToExport: { [key: string]: any } = {};
+        const keysToExport = [
+            'users', 'products', 'invoices', 'expenses', 'returnRequests',
+            'requestedBooks', 'customers', 'suppliers', 'purchases',
+            'financialAccounts', 'financialTransactions', 'budgets',
+            'lowStockThreshold', 'shopName', 'shopAddress'
+        ];
+        
+        keysToExport.forEach(key => {
+            const item = localStorage.getItem(key);
+            if (item) {
+                dataToExport[key] = JSON.parse(item);
+            }
+        });
+
+        const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+          JSON.stringify(dataToExport, null, 2)
+        )}`;
+        const link = document.createElement("a");
+        link.href = jsonString;
+        const date = new Date().toISOString().split('T')[0];
+        link.download = `library_backup_${date}.json`;
+        link.click();
+        alert('تم بدء تصدير البيانات بنجاح! الملف يحتوي على جميع بيانات التطبيق.');
     } catch (error) {
-      console.error("Error exporting data:", error);
-      alert('حدث خطأ أثناء تصدير البيانات.');
+        console.error('Export failed:', error);
+        alert('فشل تصدير البيانات.');
     }
   };
 
-  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+  
+  const translateKeyToArabic = (key: string): string => {
+    const map: { [key: string]: string } = {
+        'products': 'الكتب',
+        'invoices': 'الفواتير والطلبات',
+        'users': 'المستخدمون',
+        'customers': 'العملاء',
+        'suppliers': 'الموردون',
+        'purchases': 'المشتريات',
+        'expenses': 'المصروفات',
+        'financialAccounts': 'الحسابات المالية',
+        'financialTransactions': 'الحركات المالية',
+        'budgets': 'الميزانيات',
+        'returnRequests': 'طلبات الإرجاع',
+        'requestedBooks': 'الكتب المطلوبة',
+    };
+    return map[key] || key;
+  }
+
+  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!window.confirm('تحذير: سيؤدي استيراد البيانات إلى استبدال جميع المنتجات والفواتير والمستخدمين الحاليين. هل تريد المتابعة؟')) {
-      event.target.value = ''; // Reset file input
-      return;
+    if (!file.name.endsWith('.json')) {
+        alert("الرجاء اختيار ملف JSON صالح.");
+        return;
     }
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      try {
         const text = e.target?.result;
-        if (typeof text !== 'string') {
-          throw new Error("File content is not valid text.");
-        }
-        const data = JSON.parse(text);
+        if (typeof text !== 'string') return;
+        
+        const confirmation = window.confirm(
+            "تحذير شديد! سيؤدي استيراد البيانات إلى حذف جميع البيانات الحالية على هذا الجهاز واستبدالها بالبيانات الموجودة في الملف.\n\nهل أنت متأكد من أنك تريد المتابعة؟"
+        );
+        
+        if (confirmation) {
+            try {
+                const data = JSON.parse(text);
+                const allAppKeys = [
+                    'users', 'products', 'invoices', 'expenses', 'returnRequests',
+                    'requestedBooks', 'customers', 'suppliers', 'purchases',
+                    'financialAccounts', 'financialTransactions', 'budgets',
+                    'lowStockThreshold', 'shopName', 'shopAddress', 'currentUser'
+                ];
 
-        // Basic validation
-        if (Array.isArray(data.products) && Array.isArray(data.invoices) && Array.isArray(data.users)) {
-          setProducts(data.products);
-          setInvoices(data.invoices);
-          localStorage.setItem('users', JSON.stringify(data.users));
-          alert('تم استيراد البيانات بنجاح! يرجى تسجيل الخروج والدخول مرة أخرى لتطبيق تغييرات المستخدمين بشكل كامل.');
-        } else {
-          throw new Error('الملف غير صالح أو لا يحتوي على الصيغة الصحيحة (products, invoices, users).');
+                const importedKeys = Object.keys(data);
+                const hasAtLeastOneValidKey = importedKeys.some(key => allAppKeys.includes(key));
+
+                if (typeof data !== 'object' || data === null || !hasAtLeastOneValidKey) {
+                    throw new Error("الملف المحدد لا يبدو كملف نسخة احتياطية صالح. قد يكون تالفًا أو من تطبيق مختلف.");
+                }
+
+                allAppKeys.forEach(key => localStorage.removeItem(key));
+
+                let importSummary = 'تم استيراد البيانات التالية بنجاح:\n\n';
+                let importedSomething = false;
+
+                allAppKeys.forEach(key => {
+                    // This check is crucial for backward compatibility.
+                    // If an old backup file is missing a new key (e.g., 'budgets'),
+                    // this will prevent an error and the app will use its default value.
+                    if (data.hasOwnProperty(key) && data[key] !== null) {
+                        const value = data[key];
+                        localStorage.setItem(key, JSON.stringify(value));
+                         if (Array.isArray(value)) {
+                            importSummary += `- ${translateKeyToArabic(key)}: ${value.length} سجل\n`;
+                        }
+                        importedSomething = true;
+                    }
+                });
+
+                if (!importedSomething) {
+                    throw new Error("لم يتم العثور على بيانات متوافقة في الملف.");
+                }
+
+                alert(importSummary + '\nسيتم إعادة تحميل التطبيق الآن.');
+                window.location.reload();
+            } catch (error) {
+                console.error("Error parsing or importing file:", error);
+                alert(`حدث خطأ أثناء استيراد الملف: ${error instanceof Error ? error.message : 'تأكد من أنه ملف تصدير صالح.'}`);
+            }
         }
-      } catch (error) {
-        console.error("Error importing data:", error);
-        const errorMessage = error instanceof Error ? error.message : "Unknown error";
-        alert(`فشل استيراد البيانات. يرجى التأكد من أن الملف صحيح.\nالخطأ: ${errorMessage}`);
-      } finally {
-        event.target.value = ''; // Reset file input
-      }
     };
-    reader.onerror = () => {
-        alert('فشل في قراءة الملف.');
-        event.target.value = '';
-    }
     reader.readAsText(file);
+    event.target.value = ''; 
   };
 
+
   return (
-    <div className="p-4 md:p-6 max-w-4xl mx-auto">
-      <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6">الإعدادات</h2>
-      
-      <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-          <h3 className="text-xl font-bold text-gray-800 mb-3">المزامنة اليدوية و النسخ الاحتياطي</h3>
-          <p className="text-gray-600 mb-6">
-            استخدم هذه الأدوات لإنشاء نسخة احتياطية من بياناتك أو لنقلها يدوياً بين أجهزتك المختلفة (مثل الكمبيوتر والجوال).
-          </p>
-
-          <div className="space-y-6">
-            
-            {/* Step 1: Export */}
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <span className="flex items-center justify-center w-8 h-8 bg-blue-600 text-white font-bold rounded-full">1</span>
-                <h4 className="text-lg font-semibold text-gray-700">تصدير البيانات (نسخ احتياطي)</h4>
-              </div>
-              <p className="text-gray-600 mb-3 pl-11">
-                اضغط على الزر لحفظ نسخة من جميع بياناتك (المنتجات، الفواتير، المستخدمين) في ملف واحد على هذا الجهاز.
-              </p>
-              <div className="pl-11">
-                <button
-                    onClick={handleExport}
-                    className="bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-                >
-                    تصدير نسخة احتياطية
-                </button>
-              </div>
+    <div className="p-6">
+      <h2 className="text-3xl font-bold text-slate-800 mb-6">الإعدادات</h2>
+      <div className="bg-white shadow-lg rounded-xl p-6 max-w-3xl mx-auto space-y-8">
+        
+        <div>
+            <h3 className="text-xl font-bold text-slate-700 border-b pb-2 mb-4">بيانات الفاتورة</h3>
+            <div className="space-y-4">
+                <InputField id="shopName" label="اسم المحل" value={shopName} onChange={(e) => setShopName(e.target.value)} />
+                <InputField id="shopAddress" label="العنوان وبيانات التواصل" value={shopAddress} onChange={(e) => setShopAddress(e.target.value)} />
             </div>
-            
-            {/* Step 2: Import */}
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <span className="flex items-center justify-center w-8 h-8 bg-green-600 text-white font-bold rounded-full">2</span>
-                <h4 className="text-lg font-semibold text-gray-700">استيراد البيانات</h4>
-              </div>
-              <p className="text-gray-600 mb-3 pl-11">
-                اختر ملف النسخة الاحتياطية لاستعادة بياناتك أو نقلها لجهاز جديد. 
-                <strong className="text-red-600"> تحذير: سيتم مسح جميع البيانات الحالية على هذا الجهاز واستبدالها بالبيانات الموجودة في الملف.</strong>
-              </p>
-               <div className="pl-11">
-                 <label htmlFor="import-file" className="cursor-pointer bg-green-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors inline-block">
-                    اختر ملف للاستيراد
-                  </label>
-                  <input
-                    id="import-file"
-                    type="file"
-                    accept=".json"
-                    onChange={handleImport}
-                    className="hidden"
-                  />
-               </div>
-            </div>
-
-          </div>
-      </div>
-
-      <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200 mt-6">
-        <h3 className="text-xl font-bold text-gray-800 mb-3">إعدادات المخزون</h3>
-        <div className="mb-4">
-          <label htmlFor="lowStockThreshold" className="block text-gray-700 text-sm font-bold mb-2">حد المخزون المنخفض</label>
-          <p className="text-gray-600 text-sm mb-2">سيتم تنبيهك عندما تصل كمية المنتج إلى هذا الحد.</p>
-          <input
-            type="number"
-            id="lowStockThreshold"
-            value={lowStockThreshold}
-            onChange={(e) => setLowStockThreshold(parseInt(e.target.value, 10) || 0)}
-            className="shadow appearance-none border rounded w-full md:w-1/3 py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-          />
         </div>
-      </div>
 
+        <div>
+            <h3 className="text-xl font-bold text-slate-700 border-b pb-2 mb-4">إعدادات المخزون</h3>
+            <div className="space-y-4">
+                <InputField id="lowStockThreshold" label="حد المخزون المنخفض (للتنبيهات)" type="number" value={lowStockThreshold.toString()} onChange={(e) => setLowStockThreshold(parseInt(e.target.value, 10) || 0)} />
+            </div>
+        </div>
+        
+        <div>
+            <h3 className="text-xl font-bold text-slate-700 border-b pb-2 mb-4">تحديث أسعار الكتب بالجملة</h3>
+            <div className="p-4 bg-amber-50 border-r-4 border-amber-400 text-amber-800 rounded-md">
+                <p className="font-bold">تحذير:</p>
+                <p className="text-sm">هذا الإجراء سيقوم بتحديث أسعار البيع والتكلفة لـ **جميع** الكتب في المخزون. لا يمكن التراجع عن هذا التغيير.</p>
+            </div>
+            <div className="flex items-end gap-4 mt-4">
+                <InputField id="priceFactor" label="معامل التغيير" type="number" value={priceFactor} onChange={e => setPriceFactor(e.target.value)} />
+                <button onClick={() => handlePriceUpdate('multiply')} className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors h-10">ضرب الأسعار</button>
+                <button onClick={() => handlePriceUpdate('divide')} className="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition-colors h-10">قسمة الأسعار</button>
+            </div>
+        </div>
+
+        <div>
+            <h3 className="text-xl font-bold text-slate-700 border-b pb-2 mb-4">استيراد وتصدير البيانات</h3>
+             <div className="p-4 bg-blue-50 border-r-4 border-blue-400 text-blue-800 rounded-md">
+                <p className="text-sm">
+                يمكنك تصدير جميع بيانات التطبيق إلى ملف واحد للحفظ كنسخة احتياطية أو لنقل البيانات إلى جهاز آخر.
+                </p>
+            </div>
+            <div className="p-4 bg-red-50 border-r-4 border-red-400 text-red-800 rounded-md mt-4">
+                <p className="font-bold">تحذير:</p>
+                <p className="text-sm">
+                استيراد البيانات سيقوم بالكتابة فوق **جميع** البيانات الحالية على هذا الجهاز. استخدم هذه الميزة بحذر.
+                </p>
+            </div>
+            <div className="flex items-center gap-4 mt-6">
+                <button onClick={handleExport} className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors h-10 flex items-center gap-2">
+                    <span className="material-symbols-outlined">download</span>
+                    تصدير البيانات
+                </button>
+                <button onClick={handleImportClick} className="bg-amber-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-amber-600 transition-colors h-10 flex items-center gap-2">
+                    <span className="material-symbols-outlined">upload</span>
+                    استيراد البيانات
+                </button>
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileImport}
+                    className="hidden"
+                    accept=".json"
+                />
+            </div>
+        </div>
+
+      </div>
     </div>
   );
 };

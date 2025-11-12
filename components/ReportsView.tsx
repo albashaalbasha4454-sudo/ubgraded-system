@@ -1,144 +1,224 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import type { Invoice, Product, Expense } from '../types';
+import { Chart, registerables } from 'chart.js';
 
-interface ReportsViewProps {
+Chart.register(...registerables);
+
+const ReportsView: React.FC<{
   invoices: Invoice[];
   products: Product[];
   expenses: Expense[];
-}
-
-const ReportsView: React.FC<ReportsViewProps> = ({ invoices, products, expenses }) => {
+}> = ({ invoices, products, expenses }) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  const { filteredInvoices, filteredExpenses } = useMemo(() => {
-    if (!startDate && !endDate) {
-      return { filteredInvoices: invoices, filteredExpenses: expenses };
-    }
+  const salesByCategoryChartRef = useRef<HTMLCanvasElement>(null);
+  const topProductsChartRef = useRef<HTMLCanvasElement>(null);
+  const profitExpenseChartRef = useRef<HTMLCanvasElement>(null);
+
+  const chartInstances = useRef<{ [key: string]: Chart | null }>({});
+
+  const reportData = useMemo(() => {
     const start = startDate ? new Date(startDate) : null;
     const end = endDate ? new Date(endDate) : null;
-    if(start) start.setHours(0,0,0,0);
-    if(end) end.setHours(23,59,59,999);
+    if (start) start.setHours(0, 0, 0, 0);
+    if (end) end.setHours(23, 59, 59, 999);
 
-    const dateFilter = (item: { date: string }) => {
-        const itemDate = new Date(item.date);
+    const dateFilter = (itemDateStr: string) => {
+        const itemDate = new Date(itemDateStr);
         if (start && itemDate < start) return false;
         if (end && itemDate > end) return false;
         return true;
-    }
-
-    return { 
-        filteredInvoices: invoices.filter(dateFilter),
-        filteredExpenses: expenses.filter(dateFilter)
     };
-  }, [invoices, expenses, startDate, endDate]);
+    
+    const completedSales = invoices.filter(inv => 
+        ((inv.type === 'sale' || inv.type === 'shipping') && inv.status === 'completed' && inv.paymentStatus === 'paid') && dateFilter(inv.paidDate!)
+    );
 
+    const returns = invoices.filter(inv => inv.type === 'return' && dateFilter(inv.date));
+    const filteredExpenses = expenses.filter(exp => dateFilter(exp.date));
 
-  const reportData = useMemo(() => {
-    const totalRevenue = filteredInvoices.reduce((sum, inv) => sum + inv.total, 0);
-    const totalSales = filteredInvoices.filter(inv => inv.type === 'sale').length;
+    const totalSalesValue = completedSales.reduce((sum, inv) => sum + inv.total, 0);
+    const totalReturnsValue = returns.reduce((sum, inv) => sum + inv.total, 0); // Note: total is negative
+    const netSales = totalSalesValue + totalReturnsValue;
+
+    const cogs = completedSales.reduce((sum, inv) => sum + (inv.totalCost || 0), 0);
+    const grossProfit = netSales - cogs;
+    
     const totalExpenses = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
-    const netProfit = totalRevenue - totalExpenses;
+    const netProfit = grossProfit - totalExpenses;
 
-    const productSales: { [key: string]: { name: string, quantitySold: number; revenue: number } } = {};
+    const transactionCount = completedSales.length;
+    const avgTransactionValue = transactionCount > 0 ? netSales / transactionCount : 0;
 
-    filteredInvoices.forEach(invoice => {
-      invoice.items.forEach(item => {
-        if (!productSales[item.productId]) {
-          productSales[item.productId] = { name: item.productName, quantitySold: 0, revenue: 0 };
-        }
-        const quantity = invoice.type === 'return' ? -item.quantity : item.quantity;
-        productSales[item.productId].quantitySold += quantity;
-        productSales[item.productId].revenue += quantity * item.price;
-      });
+    // Chart Data
+    const salesByCategory: { [key: string]: number } = {};
+    const productSales: { [key: string]: { name: string, revenue: number } } = {};
+    completedSales.forEach(inv => {
+        inv.items.forEach(item => {
+            const product = products.find(p => p.id === item.productId);
+            const category = product?.category || 'غير مصنف';
+            const revenue = item.quantity * (item.price - (item.discount || 0));
+            
+            salesByCategory[category] = (salesByCategory[category] || 0) + revenue;
+            
+            if (!productSales[item.productId]) {
+              productSales[item.productId] = { name: item.productName, revenue: 0 };
+            }
+            productSales[item.productId].revenue += revenue;
+        });
+    });
+    
+    const topProducts = Object.values(productSales).sort((a,b) => b.revenue - a.revenue).slice(0, 5);
+
+    const dailyData: { [date: string]: { profit: number, expense: number } } = {};
+    [...completedSales, ...returns].forEach(inv => {
+        const day = new Date(inv.date).toISOString().split('T')[0];
+        if (!dailyData[day]) dailyData[day] = { profit: 0, expense: 0 };
+        dailyData[day].profit += inv.totalProfit || 0;
+    });
+    filteredExpenses.forEach(exp => {
+        const day = new Date(exp.date).toISOString().split('T')[0];
+        if (!dailyData[day]) dailyData[day] = { profit: 0, expense: 0 };
+        dailyData[day].expense += exp.amount;
     });
 
-    const bestSellingByQuantity = Object.values(productSales).sort((a, b) => b.quantitySold - a.quantitySold);
-    const bestSellingByRevenue = [...Object.values(productSales)].sort((a, b) => b.revenue - a.revenue);
 
     return {
-      totalRevenue,
-      totalSales,
-      bestSellingByQuantity,
-      bestSellingByRevenue,
-      totalExpenses,
-      netProfit,
+        netSales, cogs, grossProfit, totalExpenses, netProfit, transactionCount, avgTransactionValue,
+        chartData: { salesByCategory, topProducts, dailyData }
     };
-  }, [filteredInvoices, filteredExpenses]);
+  }, [invoices, expenses, products, startDate, endDate]);
 
-  const StatCard = ({ title, value, subtext, valueClassName }: { title: string, value: string | number, subtext?: string, valueClassName?: string }) => (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h3 className="text-gray-500 text-lg">{title}</h3>
-      <p className={`text-3xl font-bold my-2 ${valueClassName || 'text-gray-800'}`}>{value}</p>
-      {subtext && <p className="text-gray-400 text-sm">{subtext}</p>}
-    </div>
-  );
+  useEffect(() => {
+    // FIX: Using Object.keys to iterate and destroy charts to ensure proper type inference.
+    Object.keys(chartInstances.current).forEach(key => chartInstances.current[key]?.destroy());
+    
+    const createChart = (ref: React.RefObject<HTMLCanvasElement>, key: string, config: any) => {
+        const ctx = ref.current?.getContext('2d');
+        if (ctx) chartInstances.current[key] = new Chart(ctx, config);
+    };
 
-  const SalesTable = ({ title, data }: { title: string, data: { name: string, quantitySold: number; revenue: number }[] }) => (
-     <div className="bg-white shadow-md rounded-lg p-4 md:p-6">
-        <h3 className="text-xl font-bold text-gray-800 mb-4">{title}</h3>
-        <div className="overflow-x-auto">
-            <table className="w-full table-auto text-right">
-                <thead className="bg-gray-100 text-gray-600 uppercase text-sm">
-                    <tr>
-                        <th className="py-3 px-6">المنتج</th>
-                        <th className="py-3 px-6">صافي الكمية المباعة</th>
-                        <th className="py-3 px-6">صافي الإيرادات</th>
-                    </tr>
-                </thead>
-                <tbody className="text-gray-700 text-sm">
-                    {data.length === 0 ? (
-                        <tr><td colSpan={3} className="text-center py-4">لا توجد بيانات لعرضها.</td></tr>
-                    ) : (
-                       data.slice(0, 10).map(item => (
-                            <tr key={item.name} className="border-b border-gray-200 hover:bg-gray-50">
-                                <td className="py-3 px-6 font-semibold">{item.name}</td>
-                                <td className="py-3 px-6">{item.quantitySold}</td>
-                                <td className="py-3 px-6">{item.revenue.toFixed(2)}</td>
-                            </tr>
-                       ))
-                    )}
-                </tbody>
-            </table>
+    // Sales by Category Chart
+    createChart(salesByCategoryChartRef, 'salesByCategory', {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(reportData.chartData.salesByCategory),
+        datasets: [{
+          data: Object.values(reportData.chartData.salesByCategory),
+          backgroundColor: ['#4f46e5', '#10b981', '#f59e0b', '#3b82f6', '#ef4444'],
+        }],
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+    });
+
+    // Top Products Chart
+    createChart(topProductsChartRef, 'topProducts', {
+      type: 'bar',
+      data: {
+        labels: reportData.chartData.topProducts.map(p => p.name),
+        datasets: [{
+          label: 'الإيرادات',
+          data: reportData.chartData.topProducts.map(p => p.revenue),
+          backgroundColor: 'rgba(59, 130, 246, 0.8)',
+          borderRadius: 4
+        }],
+      },
+      options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y' }
+    });
+
+    // Profit vs Expense Chart
+    const sortedDays = Object.keys(reportData.chartData.dailyData).sort();
+    createChart(profitExpenseChartRef, 'profitExpense', {
+      type: 'line',
+      data: {
+        labels: sortedDays,
+        datasets: [
+          {
+            label: 'إجمالي الربح',
+            data: sortedDays.map(day => reportData.chartData.dailyData[day].profit),
+            borderColor: 'rgb(34, 197, 94)',
+            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+            fill: true,
+            tension: 0.3,
+          },
+          {
+            label: 'المصروفات',
+            data: sortedDays.map(day => reportData.chartData.dailyData[day].expense),
+            borderColor: 'rgb(239, 68, 68)',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            fill: true,
+            tension: 0.3,
+          }
+        ],
+      },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+    
+    return () => {
+      // FIX: Using Object.keys to iterate and destroy charts to ensure proper type inference.
+      Object.keys(chartInstances.current).forEach(key => chartInstances.current[key]?.destroy());
+    }
+  }, [reportData]);
+
+  const StatCard = ({ title, value, icon, valueClassName }: { title: string, value: string | number, icon: string, valueClassName?: string }) => (
+    <div className="bg-white p-4 rounded-xl shadow-lg flex items-center gap-4">
+        <div className={`p-3 rounded-full ${valueClassName} bg-opacity-10`}>
+            <span className={`material-symbols-outlined text-3xl ${valueClassName}`}>{icon}</span>
+        </div>
+        <div>
+            <h3 className="text-slate-500 text-sm">{title}</h3>
+            <p className={`text-xl font-bold ${valueClassName || 'text-slate-800'}`}>{value}</p>
         </div>
     </div>
   );
 
-
   return (
-    <div className="p-4 md:p-6">
-      <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6">تقرير الأرباح والخسائر</h2>
-
-       <div className="bg-white p-4 rounded-lg shadow-md mb-6">
-            <h3 className="text-lg font-semibold mb-2">تصفية حسب التاريخ</h3>
-            <div className="flex flex-col md:flex-row gap-4 items-center">
-                <div className="flex-1 w-full">
-                    <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">من تاريخ</label>
-                    <input type="date" id="startDate" value={startDate} onChange={e => setStartDate(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"/>
-                </div>
-                <div className="flex-1 w-full">
-                    <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">إلى تاريخ</label>
-                    <input type="date" id="endDate" value={endDate} onChange={e => setEndDate(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"/>
-                </div>
-            </div>
-       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard title="صافي الإيرادات" value={`${reportData.totalRevenue.toFixed(2)}`} />
-        <StatCard title="إجمالي المصروفات" value={`${reportData.totalExpenses.toFixed(2)}`} />
-        <StatCard 
-            title="صافي الربح" 
-            value={`${reportData.netProfit.toFixed(2)}`}
-            valueClassName={reportData.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}
-        />
-        <StatCard title="إجمالي فواتير البيع" value={reportData.totalSales} subtext="فاتورة" />
+    <div className="p-6">
+      <div className="bg-white shadow-lg rounded-xl mb-6">
+        <div className="p-6 border-b border-slate-200">
+            <h2 className="text-2xl font-bold text-slate-800">التقارير ولوحة التحكم</h2>
+            <p className="text-sm text-slate-500 mt-1">نظرة شاملة ودقيقة على أداء محلك التجاري.</p>
+        </div>
+        <div className="p-6 flex flex-col md:flex-row gap-4 items-center">
+            <InputField label="من تاريخ" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+            <InputField label="إلى تاريخ" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-6">
+        <StatCard title="صافي المبيعات" value={`${reportData.netSales.toFixed(2)}`} icon="monitoring" valueClassName="text-indigo-600" />
+        <StatCard title="تكلفة البضاعة المباعة" value={`${reportData.cogs.toFixed(2)}`} icon="sell" valueClassName="text-orange-600" />
+        <StatCard title="إجمالي الربح" value={`${reportData.grossProfit.toFixed(2)}`} icon="account_balance" valueClassName="text-sky-600" />
+        <StatCard title="المصروفات" value={`${reportData.totalExpenses.toFixed(2)}`} icon="receipt_long" valueClassName="text-red-500" />
+        <StatCard title="صافي الربح" value={`${reportData.netProfit.toFixed(2)}`} icon="trending_up" valueClassName={reportData.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}/>
+        <StatCard title="متوسط الفاتورة" value={`${reportData.avgTransactionValue.toFixed(2)}`} icon="payments" valueClassName="text-fuchsia-600" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-         <SalesTable title="أكثر 10 منتجات مبيعًا (حسب صافي الكمية)" data={reportData.bestSellingByQuantity} />
-         <SalesTable title="أكثر 10 منتجات مبيعًا (حسب صافي الإيرادات)" data={reportData.bestSellingByRevenue} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-3 bg-white p-6 rounded-xl shadow-lg h-96">
+            <h3 className="text-xl font-bold text-slate-800 mb-4">إجمالي الربح والمصروفات خلال الفترة</h3>
+            <div className="relative h-72"><canvas ref={profitExpenseChartRef}></canvas></div>
+          </div>
+          <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg h-96">
+            <h3 className="text-xl font-bold text-slate-800 mb-4">أعلى 5 كتب مبيعاً (حسب الإيراد)</h3>
+            <div className="relative h-72"><canvas ref={topProductsChartRef}></canvas></div>
+          </div>
+          <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg h-96">
+            <h3 className="text-xl font-bold text-slate-800 mb-4">المبيعات حسب التصنيف</h3>
+             <div className="relative h-72"><canvas ref={salesByCategoryChartRef}></canvas></div>
+          </div>
       </div>
     </div>
   );
 };
+
+const InputField: React.FC<{label: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void, type?: string}> = ({label, value, onChange, type="text"}) => (
+    <div className="flex-1 w-full">
+        <label className="block text-sm font-medium text-slate-700">{label}</label>
+        <input type={type} value={value} onChange={onChange} className="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"/>
+    </div>
+);
+
+
 export default ReportsView;

@@ -1,5 +1,5 @@
 {
-  "name": "albasha",
+  "name": "sooq-alketab-احدث-تطبيقن",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "@google/genai": "^1.29.0",
+    "chart.js": "4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

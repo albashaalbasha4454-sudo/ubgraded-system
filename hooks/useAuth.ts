@@ -1,76 +1,67 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import useLocalStorage from './useLocalStorage';
 import type { User } from '../types';
 
-// In a real app, don't store passwords in plaintext. This is for demonstration.
-const defaultAdmin: User = {
-  id: 'admin-001',
-  username: 'admin',
-  password: 'albasha.1234',
-  role: 'admin',
-};
+// Hashing function for demonstration.
+const simpleHash = (password: string, salt: string) => `hashed_${password}_with_${salt}`;
 
-const defaultCashier: User = {
-  id: 'cashier-001',
-  username: 'cashier',
-  password: 'albasha.1234',
-  role: 'cashier',
-};
-
-function useAuth() {
-  const [users, setUsers] = useLocalStorage<User[]>('users', []);
-  // باستخدام useLocalStorage هنا، ستتم مزامنة حالة تسجيل الدخول الآن عبر علامات التبويب.
-  // كما أنه يحافظ على الجلسة عبر عمليات إعادة تشغيل المتصفح.
+/**
+ * A robust authentication hook.
+ * @param users - The single source of truth for the list of users.
+ * @returns An object with the current user session and login/logout functions.
+ */
+const useAuth = (users: User[]) => {
   const [currentUser, setCurrentUser] = useLocalStorage<User | null>('currentUser', null);
 
+  /**
+   * This effect adds a crucial layer of security and stability.
+   * It runs whenever the master user list changes (e.g., from a data import)
+   * or on initial app load. It ensures the session data stored in localStorage
+   * is not stale.
+   */
   useEffect(() => {
-    // If no users exist in localStorage, create the default admin and cashier users.
-    if (users.length === 0) {
-      setUsers([defaultAdmin, defaultCashier]);
+    if (currentUser) {
+      // Find the corresponding user in the definitive list from the main app state.
+      const freshUser = users.find(u => u.id === currentUser.id);
+      
+      // If the user is not found in the master list (e.g., deleted) or if the
+      // stored user data is different (e.g., password/role was changed),
+      // the session is invalid. Force a logout to ensure security and prevent errors.
+      if (!freshUser || JSON.stringify(freshUser) !== JSON.stringify(currentUser)) {
+        setCurrentUser(null);
+      }
     }
-  }, [users, setUsers]);
+  }, [users, currentUser, setCurrentUser]);
 
-  const login = (username: string, password: string): boolean => {
-    const user = users.find(u => u.username === username && u.password === password);
+
+  /**
+   * Attempts to log in a user with the given credentials.
+   * It always validates against the up-to-date 'users' list provided from the main app state.
+   */
+  const login = useCallback(async (username: string, password: string): Promise<boolean> => {
+    const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
     if (user) {
-      setCurrentUser(user);
-      return true;
+        const passwordHash = simpleHash(password, user.salt);
+        if (passwordHash === user.passwordHash) {
+            setCurrentUser(user);
+            return true;
+        }
     }
     return false;
-  };
+  }, [users, setCurrentUser]);
 
-  const logout = () => {
+  /**
+   * Logs out the current user by clearing the session.
+   */
+  const logout = useCallback(() => {
     setCurrentUser(null);
-  };
+  }, [setCurrentUser]);
 
-  const addUser = (user: Omit<User, 'id'>) => {
-    if (users.some(u => u.username === user.username)) {
-      throw new Error('اسم المستخدم موجود بالفعل.');
-    }
-    setUsers(prev => [...prev, { ...user, id: crypto.randomUUID() }]);
-  };
-  
-  const deleteUser = (id: string) => {
-    if (id === defaultAdmin.id) {
-        alert('لا يمكن حذف حساب المدير الافتراضي.');
-        return;
-    }
-    if (id === defaultCashier.id) {
-      alert('لا يمكن حذف حساب الكاشير الافتراضي.');
-      return;
-    }
-    setUsers(prev => prev.filter(u => u.id !== id));
-  };
-
-
-  return {
-    currentUser,
-    users,
-    login,
+  return { 
+    currentUser, 
+    login, 
     logout,
-    addUser,
-    deleteUser,
   };
-}
+};
 
 export default useAuth;
