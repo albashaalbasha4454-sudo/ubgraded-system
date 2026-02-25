@@ -1,7 +1,7 @@
 {
-  "name": "dreams-برنامج",
-  "private": true,
-  "version": "0.0.0",
+  "name": "sooq-alketab-2026",
+  "private": false,
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
