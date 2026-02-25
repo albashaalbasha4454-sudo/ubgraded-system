@@ -42,6 +42,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({ accounts, accountBalances, tr
     switch(tx.type) {
         case 'sale_income': return `إيراد مبيعات ${tx.description}`;
         case 'expense': return `مصروف: ${tx.description} (من ${from})`;
+        case 'expense_reversal': return `إلغاء مصروف: ${tx.description} (إلى ${to})`;
         case 'capital_deposit': return `إيداع رأس مال في ${to}`;
         case 'profit_withdrawal': return `سحب أرباح من ${from}`;
         case 'supplier_payment': return `دفعة لمورد من ${from}`;
@@ -52,7 +53,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({ accounts, accountBalances, tr
 
 
   return (
-    <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Column */}
         <div className="lg:col-span-2 space-y-6">
             <div className="bg-white shadow-lg rounded-xl p-6">

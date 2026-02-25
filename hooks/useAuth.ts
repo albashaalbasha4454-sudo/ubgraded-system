@@ -24,11 +24,15 @@ const useAuth = (users: User[]) => {
       // Find the corresponding user in the definitive list from the main app state.
       const freshUser = users.find(u => u.id === currentUser.id);
       
-      // If the user is not found in the master list (e.g., deleted) or if the
-      // stored user data is different (e.g., password/role was changed),
-      // the session is invalid. Force a logout to ensure security and prevent errors.
-      if (!freshUser || JSON.stringify(freshUser) !== JSON.stringify(currentUser)) {
+      // If the user is not found in the master list (e.g., deleted), the session is invalid.
+      // Force a logout to ensure security.
+      if (!freshUser) {
         setCurrentUser(null);
+      } 
+      // If the stored user data is different from the master list (e.g., role change),
+      // update the session with the fresh data to keep it in sync without logging out.
+      else if (JSON.stringify(freshUser) !== JSON.stringify(currentUser)) {
+        setCurrentUser(freshUser);
       }
     }
   }, [users, currentUser, setCurrentUser]);

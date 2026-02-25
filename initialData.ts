@@ -15,11 +15,14 @@ const createInitialUsers = (): User[] => {
 
 const createInitialProducts = (): Product[] => {
     return [
-        { id: 'prod-1', name: 'كتاب ألف ليلة وليلة', author: 'غير معروف', category: 'أدب عربي', quantity: 15, price: 80, costPrice: 50 },
-        { id: 'prod-2', name: 'مقدمة ابن خلدون', author: 'ابن خلدون', category: 'تاريخ', quantity: 8, price: 120, costPrice: 85 },
-        { id: 'prod-3', name: 'لا تحزن', author: 'عائض القرني', category: 'تنمية بشرية', quantity: 25, price: 60, costPrice: 40 },
-        { id: 'prod-4', name: 'ثلاثية غرناطة', author: 'رضوى عاشور', category: 'روايات', quantity: 3, price: 95, costPrice: 65 },
-        { id: 'prod-5', name: 'الأمير الصغير', author: 'أنطوان دو سانت إكزوبيري', category: 'أدب أطفال', quantity: 0, price: 45, costPrice: 30 },
+        { id: 'prod-1', name: 'كتاب ألف ليلة وليلة', type: 'product', author: 'غير معروف', category: 'أدب عربي', quantity: 15, price: 80, costPrice: 50 },
+        { id: 'prod-2', name: 'مقدمة ابن خلدون', type: 'product', author: 'ابن خلدون', category: 'تاريخ', quantity: 8, price: 120, costPrice: 85 },
+        { id: 'prod-3', name: 'لا تحزن', type: 'product', author: 'عائض القرني', category: 'تنمية بشرية', quantity: 25, price: 60, costPrice: 40 },
+        { id: 'prod-4', name: 'ثلاثية غرناطة', type: 'product', author: 'رضوى عاشور', category: 'روايات', quantity: 3, price: 95, salePrice: 90, costPrice: 65 },
+        { id: 'prod-5', name: 'الأمير الصغير', type: 'product', author: 'أنطوان دو سانت إكزوبيري', category: 'أدب أطفال', quantity: 0, price: 45, costPrice: 30 },
+        { id: 'prod-6', name: 'قلم تحديد فوسفوري', type: 'product', category: 'أدوات مكتبية', quantity: 50, price: 15, costPrice: 8 },
+        { id: 'prod-7', name: 'مجموعة ستيكي نوت', type: 'product', category: 'أدوات مكتبية', quantity: 30, price: 25, costPrice: 15 },
+        { id: 'prod-8', name: 'خدمة تغليف احترافي', type: 'service', category: 'خدمات', quantity: 9999, price: 30 },
     ];
 };
 
@@ -39,7 +42,7 @@ const createInitialSuppliers = (): Supplier[] => {
 
 const createInitialAccounts = (): FinancialAccount[] => {
     return [
-        { id: 'cash-default', name: 'الصندوق الرئيسي', type: 'cash' },
+        { id: 'cash-default', name: 'الخزينة الرئيسية (للإدارة)', type: 'cash' },
         { id: 'bank-default', name: 'الحساب البنكي', type: 'bank' },
     ];
 }

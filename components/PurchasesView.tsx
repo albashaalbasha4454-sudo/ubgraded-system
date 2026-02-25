@@ -14,7 +14,6 @@ interface PurchasesViewProps {
   onUpdatePurchase: (id: string, purchase: Purchase) => void;
   onDeletePurchase: (id: string) => void;
   onAddSupplier: (supplier: Omit<Supplier, 'id'>) => Supplier;
-  onStockIn: (purchaseId: string) => void;
   onAddPayment: (purchaseId: string, amount: number, accountId: string) => void;
   createProduct: (product: Omit<Product, 'id'>) => Product;
   updateProduct: (id: string, product: Omit<Product, 'id'>) => void;
@@ -22,8 +21,21 @@ interface PurchasesViewProps {
 
 const ITEMS_PER_PAGE = 10;
 
+const StatCard = ({ title, value, icon, valueClassName }: { title: string; value: string | number; icon: string; valueClassName?: string }) => (
+    <div className="bg-slate-50 p-4 rounded-xl shadow-sm flex items-center gap-4 border border-slate-200">
+        <div className={`p-3 rounded-full ${valueClassName} bg-opacity-10`}>
+            <span className={`material-symbols-outlined text-3xl ${valueClassName}`}>{icon}</span>
+        </div>
+        <div>
+            <h3 className="text-slate-500 text-sm">{title}</h3>
+            <p className={`text-xl font-bold ${valueClassName || 'text-slate-800'}`}>{value}</p>
+        </div>
+    </div>
+);
+
+
 const PurchasesView: React.FC<PurchasesViewProps> = ({
-  purchases, products, suppliers, accounts, onAddPurchase, onUpdatePurchase, onDeletePurchase, onAddSupplier, onStockIn, onAddPayment, createProduct, updateProduct
+  purchases, products, suppliers, accounts, onAddPurchase, onUpdatePurchase, onDeletePurchase, onAddSupplier, onAddPayment, createProduct, updateProduct
 }) => {
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const [paymentModalPurchase, setPaymentModalPurchase] = useState<Purchase | null>(null);
@@ -39,6 +51,13 @@ const PurchasesView: React.FC<PurchasesViewProps> = ({
   }, [sortedPurchases, currentPage]);
 
   const totalPages = Math.ceil(sortedPurchases.length / ITEMS_PER_PAGE);
+
+  const purchaseStats = useMemo(() => {
+    const totalCost = purchases.reduce((sum, p) => sum + p.totalCost, 0);
+    const totalPaid = purchases.reduce((sum, p) => sum + p.payments.reduce((s, payment) => s + payment.amount, 0), 0);
+    const accountsPayable = totalCost - totalPaid;
+    return { totalCost, accountsPayable };
+  }, [purchases]);
   
   const getStatusBadge = (status: Purchase['paymentStatus']) => {
     switch (status) {
@@ -49,7 +68,7 @@ const PurchasesView: React.FC<PurchasesViewProps> = ({
   };
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
        <div className="bg-white shadow-lg rounded-xl">
          <div className="p-6 border-b border-slate-200 flex justify-between items-center">
             <div>
@@ -61,6 +80,11 @@ const PurchasesView: React.FC<PurchasesViewProps> = ({
                 إضافة فاتورة شراء
             </button>
         </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6 bg-slate-50 border-b border-slate-200">
+            <StatCard title="إجمالي تكلفة المشتريات" value={purchaseStats.totalCost.toFixed(2)} icon="shopping_bag" valueClassName="text-indigo-600" />
+            <StatCard title="ديون الموردين (المتبقي)" value={purchaseStats.accountsPayable.toFixed(2)} icon="receipt_long" valueClassName="text-red-600" />
+            <StatCard title="عدد الموردين" value={suppliers.length} icon="store" valueClassName="text-green-600" />
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full table-auto text-right">
             <thead className="bg-slate-50 text-slate-600 uppercase text-sm">
@@ -69,7 +93,6 @@ const PurchasesView: React.FC<PurchasesViewProps> = ({
                 <th className="py-3 px-6">المورد</th>
                 <th className="py-3 px-6">التكلفة الإجمالية</th>
                 <th className="py-3 px-6 text-center">حالة الدفع</th>
-                <th className="py-3 px-6 text-center">حالة المخزون</th>
                 <th className="py-3 px-6 text-center">الإجراءات</th>
               </tr>
             </thead>
@@ -81,17 +104,7 @@ const PurchasesView: React.FC<PurchasesViewProps> = ({
                   <td className="py-3 px-6 font-bold">{p.totalCost.toFixed(2)}</td>
                   <td className="py-3 px-6 text-center">{getStatusBadge(p.paymentStatus)}</td>
                   <td className="py-3 px-6 text-center">
-                    {p.isStockedIn 
-                      ? <span className="bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">أُدخلت المخزون</span> 
-                      : <span className="bg-orange-100 text-orange-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">لم تدخل المخزون</span>}
-                  </td>
-                  <td className="py-3 px-6 text-center">
                     <div className="flex items-center justify-center gap-1">
-                        {!p.isStockedIn && (
-                        <button onClick={() => onStockIn(p.id)} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-green-600 transition-colors" title="إدخال للمخزون">
-                            <span className="material-symbols-outlined text-lg">inventory</span>
-                        </button>
-                        )}
                         {p.paymentStatus !== 'paid' && (
                         <button onClick={() => setPaymentModalPurchase(p)} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-blue-600 transition-colors" title="إضافة دفعة">
                             <span className="material-symbols-outlined text-lg">add_card</span>

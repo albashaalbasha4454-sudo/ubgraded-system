@@ -162,6 +162,12 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ products, suppliers, onSa
   return (
     <Modal isOpen={true} onClose={onCancel} title="إضافة فاتورة شراء جديدة" size="xl">
       <form onSubmit={handleSubmit} className="space-y-4">
+        <p className="flex items-center gap-2 text-sm text-indigo-800 mb-4 p-3 bg-indigo-50 border-r-4 border-indigo-400 rounded-lg">
+            <span className="material-symbols-outlined">info</span>
+            <span>
+                عند حفظ الفاتورة، سيتم تحديث كميات الكتب المشتراة في المخزون تلقائيًا.
+            </span>
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <label htmlFor="supplier" className="block text-slate-700 text-sm font-bold mb-2">المورد / الناشر</label>

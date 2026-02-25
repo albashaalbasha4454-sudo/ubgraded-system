@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { Invoice, OrderStatus, OrderType, PaymentStatus, User } from '../types';
 import PrintInvoice from '../PrintInvoice';
 import ReturnModal from './ReturnModal';
+import RequestReturnModal from './RequestReturnModal';
 import Pagination from './common/Pagination';
 
 interface OrdersViewProps {
@@ -10,17 +11,22 @@ interface OrdersViewProps {
   onUpdateStatus: (orderId: string, status: OrderStatus, paymentStatus?: PaymentStatus) => void;
   onConvertToSale: (reservation: Invoice) => void;
   processReturn: (originalInvoiceId: string, returnItems: any[]) => void;
+  sendReturnRequest: (originalInvoice: Invoice, returnItems: any[]) => void;
   currentUser: User;
+  shopName: string;
+  shopAddress: string;
 }
 
 const ITEMS_PER_PAGE = 15;
 
-const OrdersView: React.FC<OrdersViewProps> = ({ invoices, users, onUpdateStatus, onConvertToSale, processReturn, currentUser }) => {
+const OrdersView: React.FC<OrdersViewProps> = ({ invoices, users, onUpdateStatus, onConvertToSale, processReturn, sendReturnRequest, currentUser, shopName, shopAddress }) => {
   const [filters, setFilters] = useState({ type: 'all', status: 'all', payment: 'all', search: '', user: 'all' });
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [invoiceToPrint, setInvoiceToPrint] = useState<Invoice | null>(null);
   const [invoiceToReturn, setInvoiceToReturn] = useState<Invoice | null>(null);
+  const [invoiceToRequestReturn, setInvoiceToRequestReturn] = useState<Invoice | null>(null);
+
 
   const filteredInvoices = useMemo(() => {
     return invoices
@@ -53,6 +59,11 @@ const OrdersView: React.FC<OrdersViewProps> = ({ invoices, users, onUpdateStatus
     setInvoiceToReturn(null);
   };
   
+  const handleSendReturnRequest = (originalInvoice: Invoice, returnItems: any[]) => {
+    sendReturnRequest(originalInvoice, returnItems);
+    setInvoiceToRequestReturn(null);
+  };
+
   const typeMap: Record<OrderType, { label: string, className: string }> = {
     sale: { label: 'بيع سريع', className: 'bg-green-100 text-green-800' },
     shipping: { label: 'شحن', className: 'bg-sky-100 text-sky-800' },
@@ -78,7 +89,7 @@ const OrdersView: React.FC<OrdersViewProps> = ({ invoices, users, onUpdateStatus
   );
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <div className="bg-white shadow-lg rounded-xl">
         <div className="p-6 border-b border-slate-200">
           <h2 className="text-2xl font-bold text-slate-800">إدارة الطلبات</h2>
@@ -114,72 +125,114 @@ const OrdersView: React.FC<OrdersViewProps> = ({ invoices, users, onUpdateStatus
           )}
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full table-auto text-right">
-            <thead className="bg-slate-50 text-slate-600 uppercase text-sm">
-              <tr>
-                <th className="py-3 px-6">الطلب</th>
-                <th className="py-3 px-6">التاريخ</th>
-                <th className="py-3 px-6">العميل</th>
-                <th className="py-3 px-6">الإجمالي</th>
-                <th className="py-3 px-6">الموظف</th>
-                <th className="py-3 px-6 text-center">النوع</th>
-                <th className="py-3 px-6 text-center">الحالة</th>
-                <th className="py-3 px-6 text-center">الدفع</th>
-                <th className="py-3 px-6 text-center">الإجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="text-slate-700 text-sm">
-              {paginatedInvoices.map((inv) => (
+        <div className="space-y-4 md:space-y-0">
+            {/* Desktop Header */}
+            <div className="hidden md:grid md:grid-cols-[1fr,1.5fr,1.5fr,1fr,1fr,1fr,1fr,1fr,1.5fr] gap-4 items-center bg-slate-50 text-slate-600 uppercase text-xs font-bold px-4 py-3 rounded-t-lg">
+                <div>الطلب</div>
+                <div>التاريخ</div>
+                <div>العميل</div>
+                <div>الإجمالي</div>
+                <div>الموظف</div>
+                <div className="text-center">النوع</div>
+                <div className="text-center">الحالة</div>
+                <div className="text-center">الدفع</div>
+                <div className="text-center">الإجراءات</div>
+            </div>
+
+            {/* Orders List / Cards */}
+            <div className="space-y-3 md:space-y-0">
+            {paginatedInvoices.map((inv) => (
                 <React.Fragment key={inv.id}>
-                    <tr className="border-b border-slate-200 hover:bg-slate-50">
-                        <td className="py-3 px-6 font-mono text-xs">{inv.id.substring(0, 12)}</td>
-                        <td className="py-3 px-6">{new Date(inv.date).toLocaleString('ar-EG')}</td>
-                        <td className="py-3 px-6">{inv.customerInfo?.name || '-'}</td>
-                        <td className="py-3 px-6 font-bold">{inv.total.toFixed(2)}</td>
-                        <td className="py-3 px-6">{inv.processedBy || '-'}</td>
-                        <td className="py-3 px-6 text-center"><Badge data={typeMap[inv.type]} /></td>
-                        <td className="py-3 px-6 text-center"><Badge data={statusMap[inv.status]} /></td>
-                        <td className="py-3 px-6 text-center"><Badge data={paymentMap[inv.paymentStatus]} /></td>
-                        <td className="py-3 px-6 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                                <button onClick={() => setExpandedId(expandedId === inv.id ? null : inv.id)} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-indigo-600 transition-colors" title="تفاصيل"><span className="material-symbols-outlined text-lg">info</span></button>
-                                <button onClick={() => setInvoiceToPrint(inv)} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-green-600 transition-colors" title="طباعة"><span className="material-symbols-outlined text-lg">print</span></button>
-                                {(inv.type === 'sale' || (inv.type === 'shipping' && inv.status === 'completed')) && currentUser.role === 'admin' && <button onClick={() => setInvoiceToReturn(inv)} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-red-600 transition-colors" title="إرجاع"><span className="material-symbols-outlined text-lg">assignment_return</span></button>}
-                                {inv.type === 'shipping' && inv.status === 'pending' && <button onClick={() => onUpdateStatus(inv.id, 'shipped')} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-blue-600 transition-colors" title="تم الشحن"><span className="material-symbols-outlined text-lg">local_shipping</span></button>}
-                                {inv.type === 'shipping' && inv.status === 'shipped' && <button onClick={() => onUpdateStatus(inv.id, 'completed', 'paid')} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-green-600 transition-colors" title="اكتمل & تم الدفع"><span className="material-symbols-outlined text-lg">task_alt</span></button>}
-                                {inv.type === 'reservation' && inv.status === 'pending' && <button onClick={() => onConvertToSale(inv)} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-green-600 transition-colors" title="تحويل لبيع"><span className="material-symbols-outlined text-lg">storefront</span></button>}
-                                {inv.status === 'pending' && <button onClick={() => onUpdateStatus(inv.id, 'cancelled')} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-red-600 transition-colors" title="إلغاء"><span className="material-symbols-outlined text-lg">cancel</span></button>}
+                    <div className={`
+                        md:grid md:grid-cols-[1fr,1.5fr,1.5fr,1fr,1fr,1fr,1fr,1fr,1.5fr] md:gap-4 md:items-center
+                        p-4 md:px-4 md:py-3 border-b border-slate-200 
+                        hover:bg-slate-50 bg-white md:bg-transparent
+                        block rounded-lg md:rounded-none shadow-sm md:shadow-none
+                    `}>
+                        {/* Mobile Header */}
+                        <div className="flex justify-between items-start mb-3 md:hidden">
+                            <div>
+                                <p className="font-mono text-xs text-slate-500">{inv.id.substring(0, 12)}</p>
+                                <h3 className="font-bold text-slate-800">{inv.customerInfo?.name || 'بيع مباشر'}</h3>
                             </div>
-                        </td>
-                    </tr>
+                            <div className="flex flex-col items-end gap-1">
+                                <Badge data={statusMap[inv.status]} />
+                                <Badge data={paymentMap[inv.paymentStatus]} />
+                            </div>
+                        </div>
+
+                        {/* Desktop Data Cells */}
+                        <div className="hidden md:block font-mono text-[10px]">{inv.id.substring(0, 12)}</div>
+                        <div className="hidden md:block text-xs">{new Date(inv.date).toLocaleString('ar-EG')}</div>
+                        <div className="hidden md:block text-xs truncate">{inv.customerInfo?.name || '-'}</div>
+                        <div className="hidden md:block font-bold text-sm">{inv.total.toFixed(2)}</div>
+                        <div className="hidden md:block text-xs">{inv.processedBy || '-'}</div>
+                        <div className="hidden md:block text-center"><Badge data={typeMap[inv.type]} /></div>
+                        <div className="hidden md:block text-center"><Badge data={statusMap[inv.status]} /></div>
+                        <div className="hidden md:block text-center"><Badge data={paymentMap[inv.paymentStatus]} /></div>
+
+                        {/* Mobile Grid Data */}
+                        <div className="grid grid-cols-2 gap-y-2 text-xs md:hidden mb-4 border-t border-slate-100 pt-3">
+                            <div><span className="text-slate-500">التاريخ:</span> {new Date(inv.date).toLocaleDateString('ar-EG')}</div>
+                            <div><span className="text-slate-500">الإجمالي:</span> <span className="font-bold">{inv.total.toFixed(2)}</span></div>
+                            <div><span className="text-slate-500">النوع:</span> <Badge data={typeMap[inv.type]} /></div>
+                            <div><span className="text-slate-500">الموظف:</span> {inv.processedBy || '-'}</div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center justify-center md:justify-center gap-1 border-t border-slate-100 pt-2 md:border-0 md:pt-0">
+                            <button onClick={() => setExpandedId(expandedId === inv.id ? null : inv.id)} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-indigo-600 transition-colors" title="تفاصيل"><span className="material-symbols-outlined text-lg">info</span></button>
+                            <button onClick={() => setInvoiceToPrint(inv)} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-green-600 transition-colors" title="طباعة"><span className="material-symbols-outlined text-lg">print</span></button>
+                            
+                            {(inv.type === 'sale' || (inv.type === 'shipping' && inv.status === 'completed')) && (
+                                currentUser.role === 'admin' ? (
+                                    <button onClick={() => setInvoiceToReturn(inv)} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-red-600 transition-colors" title="إرجاع">
+                                        <span className="material-symbols-outlined text-lg">assignment_return</span>
+                                    </button>
+                                ) : (
+                                    <button onClick={() => setInvoiceToRequestReturn(inv)} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-orange-600 transition-colors" title="طلب إرجاع">
+                                        <span className="material-symbols-outlined text-lg">forward_to_inbox</span>
+                                    </button>
+                                )
+                            )}
+
+                            {inv.type === 'shipping' && inv.status === 'pending' && <button onClick={() => onUpdateStatus(inv.id, 'shipped')} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-blue-600 transition-colors" title="تم الشحن"><span className="material-symbols-outlined text-lg">local_shipping</span></button>}
+                            {inv.type === 'shipping' && inv.status === 'shipped' && <button onClick={() => onUpdateStatus(inv.id, 'completed', 'paid')} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-green-600 transition-colors" title="اكتمل & تم الدفع"><span className="material-symbols-outlined text-lg">task_alt</span></button>}
+                            {inv.type === 'reservation' && inv.status === 'pending' && <button onClick={() => onConvertToSale(inv)} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-green-600 transition-colors" title="تحويل لبيع"><span className="material-symbols-outlined text-lg">storefront</span></button>}
+                            {inv.status === 'pending' && <button onClick={() => onUpdateStatus(inv.id, 'cancelled')} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-red-600 transition-colors" title="إلغاء"><span className="material-symbols-outlined text-lg">cancel</span></button>}
+                        </div>
+                    </div>
                     {expandedId === inv.id && (
-                        <tr className="bg-slate-50">
-                            <td colSpan={9} className="p-4 text-xs">
-                                <p><strong>الهاتف:</strong> {inv.customerInfo?.phone}</p>
-                                <p><strong>العنوان:</strong> {inv.customerInfo?.address}</p>
-                                <p><strong>مصدر الطلب:</strong> {inv.source}</p>
-                                <p><strong>أجور الشحن:</strong> {inv.shippingFee?.toFixed(2) || '0.00'}</p>
-                                <h4 className="font-bold mt-2 mb-1">الأصناف:</h4>
-                                <ul className="list-disc list-inside">
-                                    {inv.items.map(item => <li key={item.productId}>{item.productName} (الكمية: {item.quantity})</li>)}
-                                </ul>
-                            </td>
-                        </tr>
+                        <div className="bg-slate-50 p-4 text-xs border-b border-slate-200">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <p><strong>الهاتف:</strong> {inv.customerInfo?.phone}</p>
+                                    <p><strong>العنوان:</strong> {inv.customerInfo?.address}</p>
+                                    <p><strong>مصدر الطلب:</strong> {inv.source}</p>
+                                    <p><strong>أجور الشحن:</strong> {inv.shippingFee?.toFixed(2) || '0.00'}</p>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold mb-1">الأصناف:</h4>
+                                    <ul className="list-disc list-inside">
+                                        {inv.items.map(item => <li key={item.productId}>{item.productName} (الكمية: {item.quantity})</li>)}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
                     )}
                 </React.Fragment>
-              ))}
-            </tbody>
-          </table>
-          {filteredInvoices.length === 0 && <p className="text-center py-8 text-slate-500">لا يوجد طلبات تطابق الفلترة.</p>}
+            ))}
+            </div>
+            {filteredInvoices.length === 0 && <p className="text-center py-8 text-slate-500">لا يوجد طلبات تطابق الفلترة.</p>}
         </div>
         <div className="p-6 border-t border-slate-200">
              <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} itemsPerPage={ITEMS_PER_PAGE} totalItems={filteredInvoices.length} />
         </div>
       </div>
 
-      {invoiceToPrint && <PrintInvoice invoice={invoiceToPrint} onClose={() => setInvoiceToPrint(null)} />}
+      {invoiceToPrint && <PrintInvoice invoice={invoiceToPrint} onClose={() => setInvoiceToPrint(null)} shopName={shopName} shopAddress={shopAddress} />}
       {invoiceToReturn && <ReturnModal invoice={invoiceToReturn} onClose={() => setInvoiceToReturn(null)} onProcessReturn={handleProcessReturn} />}
+      {invoiceToRequestReturn && <RequestReturnModal invoice={invoiceToRequestReturn} onClose={() => setInvoiceToRequestReturn(null)} onSendRequest={handleSendReturnRequest} />}
     </div>
   );
 };

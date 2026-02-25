@@ -1,11 +1,14 @@
 export interface Product {
   id: string;
   name: string;
+  type: 'product' | 'service';
   author?: string;
   category?: string;
   quantity: number;
   price: number;
+  salePrice?: number;
   costPrice?: number;
+  allocated?: number;
 }
 
 export interface InvoiceItem {
@@ -129,6 +132,7 @@ export interface FinancialAccount {
     id: string;
     name:string;
     type: 'cash' | 'bank' | 'other';
+    userId?: string;
 }
 
 export type FinancialTransactionType = 
@@ -137,7 +141,9 @@ export type FinancialTransactionType =
     | 'capital_deposit' 
     | 'profit_withdrawal' 
     | 'supplier_payment' 
-    | 'transfer';
+    | 'return_refund'
+    | 'transfer'
+    | 'expense_reversal';
 
 export interface FinancialTransaction {
     id: string;
@@ -156,4 +162,19 @@ export interface Budget {
     id: string;
     name: string;
     targetAmount: number;
+}
+
+export interface TillCloseout {
+  id: string;
+  date: string; // ISO string for the closing time
+  closedByUserId: string;
+  closedByUsername: string;
+  forDate: string; // ISO string YYYY-MM-DD
+  totalSales: number;
+  totalReturns: number; // Positive number representing refund amount
+  netCashExpected: number;
+  countedCash: number;
+  difference: number;
+  notes?: string;
+  invoiceIds: string[];
 }

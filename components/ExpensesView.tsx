@@ -32,7 +32,7 @@ const ExpensesView: React.FC<ExpensesViewProps> = ({ expenses, accounts, addExpe
   };
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <div className="bg-white shadow-lg rounded-xl">
         <div className="p-6 border-b border-slate-200 flex justify-between items-center">
             <div>
@@ -44,30 +44,48 @@ const ExpensesView: React.FC<ExpensesViewProps> = ({ expenses, accounts, addExpe
                تسجيل مصروف
             </button>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full table-auto text-right">
-            <thead className="bg-slate-50 text-slate-600 uppercase text-sm">
-              <tr>
-                <th className="py-3 px-6">التاريخ</th>
-                <th className="py-3 px-6">البيان</th>
-                <th className="py-3 px-6">المبلغ</th>
-                <th className="py-3 px-6">التصنيف</th>
-                <th className="py-3 px-6">دُفع من</th>
-              </tr>
-            </thead>
-            <tbody className="text-slate-700 text-sm">
-              {paginatedExpenses.map((expense) => (
-                <tr key={expense.id} className="border-b border-slate-200 hover:bg-slate-50">
-                  <td className="py-3 px-6">{new Date(expense.date).toLocaleDateString('ar-EG')}</td>
-                  <td className="py-3 px-6 font-semibold">{expense.description}</td>
-                  <td className="py-3 px-6 font-bold text-red-600">{expense.amount.toFixed(2)}</td>
-                  <td className="py-3 px-6">{expense.category || '-'}</td>
-                  <td className="py-3 px-6">{accounts.find(a => a.id === expense.accountId)?.name || 'غير معروف'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {sortedExpenses.length === 0 && <p className="text-center py-8 text-slate-500">لا يوجد مصروفات لعرضها.</p>}
+        <div className="space-y-4 md:space-y-0">
+            {/* Desktop Header */}
+            <div className="hidden md:grid md:grid-cols-5 gap-4 items-center bg-slate-50 text-slate-600 uppercase text-xs font-bold px-6 py-3 rounded-t-lg">
+                <div>التاريخ</div>
+                <div>البيان</div>
+                <div>المبلغ</div>
+                <div>التصنيف</div>
+                <div>دُفع من</div>
+            </div>
+
+            {/* Expenses List / Cards */}
+            <div className="space-y-3 md:space-y-0">
+            {paginatedExpenses.map((expense) => (
+                <div key={expense.id} className={`
+                    md:grid md:grid-cols-5 md:gap-4 md:items-center
+                    p-4 md:px-6 md:py-3 border-b border-slate-200 
+                    hover:bg-slate-50 bg-white md:bg-transparent
+                    block rounded-lg md:rounded-none shadow-sm md:shadow-none
+                `}>
+                    {/* Mobile Header */}
+                    <div className="flex justify-between items-start mb-2 md:hidden">
+                        <h3 className="font-bold text-slate-800">{expense.description}</h3>
+                        <span className="font-bold text-red-600">{expense.amount.toFixed(2)}</span>
+                    </div>
+
+                    {/* Desktop Data Cells */}
+                    <div className="hidden md:block text-sm">{new Date(expense.date).toLocaleDateString('ar-EG')}</div>
+                    <div className="hidden md:block font-semibold text-sm">{expense.description}</div>
+                    <div className="hidden md:block font-bold text-red-600 text-sm">{expense.amount.toFixed(2)}</div>
+                    <div className="hidden md:block text-sm">{expense.category || '-'}</div>
+                    <div className="hidden md:block text-sm">{accounts.find(a => a.id === expense.accountId)?.name || 'غير معروف'}</div>
+
+                    {/* Mobile Grid Data */}
+                    <div className="grid grid-cols-2 gap-y-2 text-xs md:hidden pt-2 border-t border-slate-100">
+                        <div><span className="text-slate-500">التاريخ:</span> {new Date(expense.date).toLocaleDateString('ar-EG')}</div>
+                        <div><span className="text-slate-500">التصنيف:</span> {expense.category || '-'}</div>
+                        <div className="col-span-2"><span className="text-slate-500">دُفع من:</span> {accounts.find(a => a.id === expense.accountId)?.name || 'غير معروف'}</div>
+                    </div>
+                </div>
+            ))}
+            </div>
+            {sortedExpenses.length === 0 && <p className="text-center py-8 text-slate-500">لا يوجد مصروفات لعرضها.</p>}
         </div>
         <div className="p-6 border-t border-slate-200">
           <Pagination

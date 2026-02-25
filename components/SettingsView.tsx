@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import useLocalStorage from '../hooks/useLocalStorage';
 import InputField from './common/InputField';
+import type { User } from '../types';
 
 interface SettingsViewProps {
   onUpdatePrices: (operation: 'multiply' | 'divide', factor: number) => void;
@@ -28,6 +29,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onUpdatePrices }) => {
             'users', 'products', 'invoices', 'expenses', 'returnRequests',
             'requestedBooks', 'customers', 'suppliers', 'purchases',
             'financialAccounts', 'financialTransactions', 'budgets',
+            'tillCloseouts', // Export new data
             'lowStockThreshold', 'shopName', 'shopAddress'
         ];
         
@@ -69,6 +71,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onUpdatePrices }) => {
         'financialAccounts': 'الحسابات المالية',
         'financialTransactions': 'الحركات المالية',
         'budgets': 'الميزانيات',
+        'tillCloseouts': 'إغلاقات الصناديق',
         'returnRequests': 'طلبات الإرجاع',
         'requestedBooks': 'الكتب المطلوبة',
     };
@@ -78,6 +81,16 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onUpdatePrices }) => {
   const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    let currentAuth: { id: string } | null = null;
+    try {
+        const authData = localStorage.getItem('currentUser');
+        if (authData) {
+            currentAuth = JSON.parse(authData);
+        }
+    } catch (e) {
+        console.error("Could not parse current user before import", e);
+    }
 
     if (!file.name.endsWith('.json')) {
         alert("الرجاء اختيار ملف JSON صالح.");
@@ -99,7 +112,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onUpdatePrices }) => {
                 const allAppKeys = [
                     'users', 'products', 'invoices', 'expenses', 'returnRequests',
                     'requestedBooks', 'customers', 'suppliers', 'purchases',
-                    'financialAccounts', 'financialTransactions', 'budgets',
+                    'financialAccounts', 'financialTransactions', 'budgets', 'tillCloseouts',
                     'lowStockThreshold', 'shopName', 'shopAddress', 'currentUser'
                 ];
 
@@ -116,9 +129,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onUpdatePrices }) => {
                 let importedSomething = false;
 
                 allAppKeys.forEach(key => {
-                    // This check is crucial for backward compatibility.
-                    // If an old backup file is missing a new key (e.g., 'budgets'),
-                    // this will prevent an error and the app will use its default value.
                     if (data.hasOwnProperty(key) && data[key] !== null) {
                         const value = data[key];
                         localStorage.setItem(key, JSON.stringify(value));
@@ -131,6 +141,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onUpdatePrices }) => {
 
                 if (!importedSomething) {
                     throw new Error("لم يتم العثور على بيانات متوافقة في الملف.");
+                }
+
+                if (currentAuth && data.users && Array.isArray(data.users)) {
+                    const importedUsers: User[] = data.users;
+                    const userStillExists = importedUsers.find(u => u.id === currentAuth!.id);
+                    if (userStillExists) {
+                        localStorage.setItem('currentUser', JSON.stringify(userStillExists));
+                    }
                 }
 
                 alert(importSummary + '\nسيتم إعادة تحميل التطبيق الآن.');
@@ -147,59 +165,64 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onUpdatePrices }) => {
 
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <h2 className="text-3xl font-bold text-slate-800 mb-6">الإعدادات</h2>
-      <div className="bg-white shadow-lg rounded-xl p-6 max-w-3xl mx-auto space-y-8">
-        
-        <div>
-            <h3 className="text-xl font-bold text-slate-700 border-b pb-2 mb-4">بيانات الفاتورة</h3>
-            <div className="space-y-4">
-                <InputField id="shopName" label="اسم المحل" value={shopName} onChange={(e) => setShopName(e.target.value)} />
-                <InputField id="shopAddress" label="العنوان وبيانات التواصل" value={shopAddress} onChange={(e) => setShopAddress(e.target.value)} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
+        <div className="space-y-8">
+            <div className="bg-white shadow-lg rounded-xl p-6">
+                <h3 className="text-xl font-bold text-slate-700 border-b pb-2 mb-4">بيانات الفاتورة</h3>
+                <div className="space-y-4">
+                    <InputField id="shopName" label="اسم المحل" value={shopName} onChange={(e) => setShopName(e.target.value)} />
+                    <InputField id="shopAddress" label="العنوان وبيانات التواصل" value={shopAddress} onChange={(e) => setShopAddress(e.target.value)} />
+                </div>
             </div>
-        </div>
 
-        <div>
-            <h3 className="text-xl font-bold text-slate-700 border-b pb-2 mb-4">إعدادات المخزون</h3>
-            <div className="space-y-4">
-                <InputField id="lowStockThreshold" label="حد المخزون المنخفض (للتنبيهات)" type="number" value={lowStockThreshold.toString()} onChange={(e) => setLowStockThreshold(parseInt(e.target.value, 10) || 0)} />
+            <div className="bg-white shadow-lg rounded-xl p-6">
+                <h3 className="text-xl font-bold text-slate-700 border-b pb-2 mb-4">إعدادات المخزون</h3>
+                <div className="space-y-4">
+                    <InputField id="lowStockThreshold" label="حد المخزون المنخفض (للتنبيهات)" type="number" value={lowStockThreshold.toString()} onChange={(e) => setLowStockThreshold(parseInt(e.target.value, 10) || 0)} />
+                </div>
+            </div>
+            
+            <div className="bg-white shadow-lg rounded-xl p-6">
+                <h3 className="text-xl font-bold text-slate-700 border-b pb-2 mb-4">تحديث أسعار الكتب بالجملة</h3>
+                <div className="p-4 bg-amber-50 border-r-4 border-amber-400 text-amber-800 rounded-md">
+                    <p className="font-bold">تحذير:</p>
+                    <p className="text-sm">هذا الإجراء سيقوم بتحديث أسعار البيع والتكلفة لـ **جميع** الكتب في المخزون. لا يمكن التراجع عن هذا التغيير.</p>
+                </div>
+                <div className="flex items-end gap-4 mt-4">
+                    <InputField id="priceFactor" label="معامل التغيير" type="number" value={priceFactor} onChange={e => setPriceFactor(e.target.value)} />
+                    <button onClick={() => handlePriceUpdate('multiply')} className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors h-10">ضرب الأسعار</button>
+                    <button onClick={() => handlePriceUpdate('divide')} className="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition-colors h-10">قسمة الأسعار</button>
+                </div>
             </div>
         </div>
         
-        <div>
-            <h3 className="text-xl font-bold text-slate-700 border-b pb-2 mb-4">تحديث أسعار الكتب بالجملة</h3>
-            <div className="p-4 bg-amber-50 border-r-4 border-amber-400 text-amber-800 rounded-md">
-                <p className="font-bold">تحذير:</p>
-                <p className="text-sm">هذا الإجراء سيقوم بتحديث أسعار البيع والتكلفة لـ **جميع** الكتب في المخزون. لا يمكن التراجع عن هذا التغيير.</p>
-            </div>
-            <div className="flex items-end gap-4 mt-4">
-                <InputField id="priceFactor" label="معامل التغيير" type="number" value={priceFactor} onChange={e => setPriceFactor(e.target.value)} />
-                <button onClick={() => handlePriceUpdate('multiply')} className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors h-10">ضرب الأسعار</button>
-                <button onClick={() => handlePriceUpdate('divide')} className="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition-colors h-10">قسمة الأسعار</button>
-            </div>
-        </div>
-
-        <div>
-            <h3 className="text-xl font-bold text-slate-700 border-b pb-2 mb-4">استيراد وتصدير البيانات</h3>
-             <div className="p-4 bg-blue-50 border-r-4 border-blue-400 text-blue-800 rounded-md">
-                <p className="text-sm">
-                يمكنك تصدير جميع بيانات التطبيق إلى ملف واحد للحفظ كنسخة احتياطية أو لنقل البيانات إلى جهاز آخر.
+        <div className="bg-white shadow-lg rounded-xl p-6">
+            <h3 className="text-xl font-bold text-slate-700 border-b pb-2 mb-4">إدارة بيانات التطبيق</h3>
+            <div className="p-4 bg-blue-50 border-r-4 border-blue-400 text-blue-800 rounded-md">
+                <p className="font-bold flex items-center gap-2"><span className="material-symbols-outlined">info</span> تصدير البيانات</p>
+                <p className="text-sm mt-1">
+                يمكنك تصدير جميع بيانات التطبيق إلى ملف واحد للحفظ كنسخة احتياطية أو لنقل البيانات إلى جهاز آخر. احتفظ بهذا الملف في مكان آمن.
                 </p>
             </div>
-            <div className="p-4 bg-red-50 border-r-4 border-red-400 text-red-800 rounded-md mt-4">
-                <p className="font-bold">تحذير:</p>
-                <p className="text-sm">
-                استيراد البيانات سيقوم بالكتابة فوق **جميع** البيانات الحالية على هذا الجهاز. استخدم هذه الميزة بحذر.
-                </p>
-            </div>
-            <div className="flex items-center gap-4 mt-6">
-                <button onClick={handleExport} className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors h-10 flex items-center gap-2">
+             <div className="mt-4">
+                <button onClick={handleExport} className="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 transition-colors h-12 flex items-center justify-center gap-2">
                     <span className="material-symbols-outlined">download</span>
-                    تصدير البيانات
+                    تصدير نسخة احتياطية الآن
                 </button>
-                <button onClick={handleImportClick} className="bg-amber-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-amber-600 transition-colors h-10 flex items-center gap-2">
+            </div>
+
+            <div className="p-4 bg-red-50 border-r-4 border-red-400 text-red-800 rounded-md mt-6">
+                <p className="font-bold flex items-center gap-2"><span className="material-symbols-outlined">warning</span> استيراد البيانات</p>
+                <p className="text-sm mt-1">
+                استيراد البيانات سيقوم بالكتابة فوق **جميع** البيانات الحالية على هذا الجهاز. استخدم هذه الميزة بحذر شديد.
+                </p>
+            </div>
+            <div className="mt-4">
+                <button onClick={handleImportClick} className="w-full bg-amber-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-amber-600 transition-colors h-12 flex items-center justify-center gap-2">
                     <span className="material-symbols-outlined">upload</span>
-                    استيراد البيانات
+                    استيراد من ملف نسخة احتياطية
                 </button>
                 <input
                     type="file"
@@ -210,7 +233,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onUpdatePrices }) => {
                 />
             </div>
         </div>
-
       </div>
     </div>
   );

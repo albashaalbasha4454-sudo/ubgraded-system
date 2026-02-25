@@ -10,11 +10,13 @@ interface InvoicesViewProps {
   processReturn: (originalInvoiceId: string, returnItems: any[]) => void;
   sendReturnRequest: (originalInvoice: Invoice, returnItems: any[]) => void;
   currentUser: User;
+  shopName: string;
+  shopAddress: string;
 }
 
 const ITEMS_PER_PAGE = 10;
 
-const InvoicesView: React.FC<InvoicesViewProps> = ({ invoices, processReturn, sendReturnRequest, currentUser }) => {
+const InvoicesView: React.FC<InvoicesViewProps> = ({ invoices, processReturn, sendReturnRequest, currentUser, shopName, shopAddress }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -154,7 +156,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({ invoices, processReturn, se
         </div>
       </div>
 
-      {invoiceToPrint && <PrintInvoice invoice={invoiceToPrint} onClose={() => setInvoiceToPrint(null)} />}
+      {invoiceToPrint && <PrintInvoice invoice={invoiceToPrint} onClose={() => setInvoiceToPrint(null)} shopName={shopName} shopAddress={shopAddress} />}
       {invoiceToReturn && <ReturnModal invoice={invoiceToReturn} onClose={() => setInvoiceToReturn(null)} onProcessReturn={handleProcessReturn} />}
       {invoiceToRequestReturn && <RequestReturnModal invoice={invoiceToRequestReturn} onClose={() => setInvoiceToRequestReturn(null)} onSendRequest={handleSendReturnRequest} />}
     </div>

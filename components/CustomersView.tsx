@@ -78,33 +78,54 @@ const CustomersView: React.FC<CustomersViewProps> = ({ customers, addCustomer, u
           </button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full table-auto text-right">
-            <thead className="bg-gray-100 text-gray-600 uppercase text-sm">
-              <tr>
-                <th className="py-3 px-6">الاسم</th>
-                <th className="py-3 px-6">الهاتف</th>
-                <th className="py-3 px-6">العنوان</th>
-                <th className="py-3 px-6">البريد الإلكتروني</th>
-                <th className="py-3 px-6 text-center">الإجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="text-gray-700 text-sm">
-              {paginatedCustomers.map((customer) => (
-                <tr key={customer.id} className="border-b border-gray-200 hover:bg-gray-50">
-                  <td className="py-3 px-6 font-semibold">{customer.name}</td>
-                  <td className="py-3 px-6">{customer.phone}</td>
-                  <td className="py-3 px-6">{customer.address || '-'}</td>
-                  <td className="py-3 px-6">{customer.email || '-'}</td>
-                  <td className="py-3 px-6 text-center">
-                    <button onClick={() => handleOpenModal(customer)} className="text-blue-600 hover:text-blue-800 font-semibold mr-4">تعديل</button>
-                    <button onClick={() => handleDelete(customer.id)} className="text-red-600 hover:text-red-800 font-semibold">حذف</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {filteredCustomers.length === 0 && <p className="text-center py-4">لا يوجد عملاء لعرضهم.</p>}
+        <div className="space-y-4 md:space-y-0">
+            {/* Desktop Header */}
+            <div className="hidden md:grid md:grid-cols-5 gap-4 items-center bg-gray-100 text-gray-600 uppercase text-xs font-bold px-6 py-3 rounded-t-lg">
+                <div>الاسم</div>
+                <div>الهاتف</div>
+                <div>العنوان</div>
+                <div>البريد الإلكتروني</div>
+                <div className="text-center">الإجراءات</div>
+            </div>
+
+            {/* Customers List / Cards */}
+            <div className="space-y-3 md:space-y-0">
+            {paginatedCustomers.map((customer) => (
+                <div key={customer.id} className={`
+                    md:grid md:grid-cols-5 md:gap-4 md:items-center
+                    p-4 md:px-6 md:py-3 border-b border-gray-200 
+                    hover:bg-gray-50 bg-white md:bg-transparent
+                    block rounded-lg md:rounded-none shadow-sm md:shadow-none
+                `}>
+                    {/* Mobile Header */}
+                    <div className="flex justify-between items-start mb-2 md:hidden">
+                        <h3 className="font-bold text-gray-800">{customer.name}</h3>
+                        <div className="flex gap-2">
+                            <button onClick={() => handleOpenModal(customer)} className="text-blue-600 hover:text-blue-800"><span className="material-symbols-outlined text-lg">edit</span></button>
+                            <button onClick={() => handleDelete(customer.id)} className="text-red-600 hover:text-red-800"><span className="material-symbols-outlined text-lg">delete</span></button>
+                        </div>
+                    </div>
+
+                    {/* Desktop Data Cells */}
+                    <div className="hidden md:block font-semibold text-sm">{customer.name}</div>
+                    <div className="hidden md:block text-sm">{customer.phone}</div>
+                    <div className="hidden md:block text-sm truncate">{customer.address || '-'}</div>
+                    <div className="hidden md:block text-sm truncate">{customer.email || '-'}</div>
+                    <div className="hidden md:flex justify-center gap-4">
+                        <button onClick={() => handleOpenModal(customer)} className="text-blue-600 hover:text-blue-800 font-semibold">تعديل</button>
+                        <button onClick={() => handleDelete(customer.id)} className="text-red-600 hover:text-red-800 font-semibold">حذف</button>
+                    </div>
+
+                    {/* Mobile Grid Data */}
+                    <div className="grid grid-cols-1 gap-y-1 text-xs md:hidden pt-2 border-t border-gray-100">
+                        <div><span className="text-gray-500">الهاتف:</span> {customer.phone}</div>
+                        <div><span className="text-gray-500">العنوان:</span> {customer.address || '-'}</div>
+                        <div><span className="text-gray-500">البريد:</span> {customer.email || '-'}</div>
+                    </div>
+                </div>
+            ))}
+            </div>
+            {filteredCustomers.length === 0 && <p className="text-center py-8 text-gray-500">لا يوجد عملاء لعرضهم.</p>}
         </div>
          <Pagination
           currentPage={currentPage}

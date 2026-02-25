@@ -1,27 +1,31 @@
 
 import React from 'react';
 import type { User } from '../types';
+import { Logo } from './Logo';
 
 interface HeaderProps {
   currentUser: User;
   onLogout: () => void;
   toggleSidebar: () => void;
-  onOpenTillReport: () => void;
+  onOpenCloseTillModal: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, toggleSidebar, onOpenTillReport }) => {
+const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, toggleSidebar, onOpenCloseTillModal }) => {
   return (
     <header className="bg-white shadow-md h-16 flex items-center justify-between px-6 z-10 sticky top-0 flex-shrink-0">
         <div className="flex items-center gap-4">
             <button onClick={toggleSidebar} className="md:hidden p-2 rounded-full hover:bg-gray-100">
                 <span className="material-symbols-outlined">menu</span>
             </button>
-            <h1 className="text-xl font-bold text-gray-800">نظام إدارة المكتبة</h1>
+            <div className="flex items-center gap-2">
+                <Logo className="h-10 w-10" />
+                <h1 className="text-xl font-bold text-gray-800 hidden sm:block">سوق الكتاب</h1>
+            </div>
         </div>
         <div className="flex items-center gap-4">
             {currentUser.role === 'cashier' && (
                 <button 
-                    onClick={onOpenTillReport} 
+                    onClick={onOpenCloseTillModal} 
                     className="flex items-center gap-2 text-gray-600 hover:text-indigo-600 p-2 rounded-lg hover:bg-indigo-50 transition-colors"
                     title="تقرير إغلاق الصندوق اليومي"
                 >
